@@ -1,0 +1,180 @@
+free c: channel.
+(* Hash *)
+fun H(bitstring): bitstring.
+
+(* Signature *)
+fun sign(bitstring, bitstring): bitstring.
+fun pk(bitstring): bitstring.
+  reduc forall x: bitstring, sk: bitstring; verify(sign(x, sk), x, pk(sk)) = true.
+
+(* Symmetric cookie_key encryption *)
+
+fun senc(bitstring, bitstring): bitstring.
+reduc forall m: bitstring, k: bitstring; sdec(senc(m,k),k) = m.
+
+(* Asymmetric cookie_key encryption *)
+fun aenc(bitstring, bitstring): bitstring.
+reduc forall m: bitstring, sk: bitstring; adec(aenc(m,pk(sk)),sk) = m.
+
+(* Host Information *)
+free HostInfoC, HostInfoS, HostInfoCA: bitstring.
+
+(* CP certificate *)
+free HostInfoCP:bitstring [private].
+
+
+(************************************************************************)
+(* Queries1: secrecy of application data *)
+free AppData: bitstring [private].
+query attacker(AppData).
+
+(* Queries2: verify integrity of response data *)
+event endResponseVerif(bitstring).
+event beginResponseVerif(bitstring).
+
+query response_data: bitstring;
+	event(endResponseVerif(response)) ==> event(beginResponseVerif(response)).
+
+(* Queries3: authentication server identity *)
+event endServerVerif(bitstring).
+event beginServerVerif(bitstring).
+
+query server_certificate: bitstring;
+	inj-event(endServerVerif(server_certificate)) ==> inj-event(beginServerVerif(server_certificate)).
+(************************************************************************)
+(* Client Process *)
+
+let processClient(cur_time: bitstring) =
+
+	(* request a cookie *)
+	new request_ip: bitstring;
+	new user_id: bitstring;
+	let cookie_request = (request_ip, user_id) in
+
+	(* out requestment *)
+	out(c, cookie_request);
+
+	(* get cookie descriptor *)
+	in(c, cookie_descriptor: bitstring);
+	let(cookie_id: bitstring, cookie_key: bitstring, cookie_attribute: bitstring) = cookie_descriptor in
+
+	(* generate a cookie *)
+	let cookie = (cookie_id, user_id, cur_time, cookie_key) in
+
+	(* out a cookie to middle box *)
+	out(c, (cookie, AppData));
+
+	(* receive response *)
+	in(c, (transferred_response: bitstring, transferred_server_certificate: bitstring));
+	
+	(* end queries: query 2 and 3 *)
+	event endResponseVerif(transferred_response);
+	event endServerVerif(transferred_server_certificate).
+
+
+(************************************************************************)
+(* Cookie Server Process *)
+
+let processCookieServer(cur_time: bitstring) = 
+	
+	(* receive cookie requestment *)
+    in(c, cookie_request: bitstring);
+
+	(* deal with requestment content *)
+	let (request_ip: bitstring, user_id: bitstring) = cookie_request in
+
+	(* prepare cookie descriptor for client *)
+	new cookie_id: bitstring;
+	new cookie_key: bitstring;
+	new cookie_attribute: bitstring;
+	let cookie_descriptor = (cookie_id, cookie_key, cookie_attribute) in
+
+	(* out descriptor to client *)
+	out(c, cookie_descriptor);
+
+	(* prepare cookie descriptor to *)
+	let cookie_time = cur_time in
+	let request_record = (cookie_id, cookie_key, user_id, cookie_time) in
+
+	(* out to middle box *)
+	out(c, request_record).
+
+	
+
+(************************************************************************)
+(* ISP Process *)
+
+let processMiddleBox() = 
+
+	(* get request_records userd for verification *)
+	in(c, request_record: bitstring);
+	let(save_cookie_id: bitstring, save_cookie_key: bitstring, save_user_id: bitstring, save_time: bitstring) = request_record in
+
+	(* receive cookie from client *)
+	in(c, (cookie: bitstring, AppData: bitstring));
+
+	(* verify the cookie *)
+	let(cookie_id: bitstring, user_id: bitstring, cookie_time: bitstring, cookie_key: bitstring) = cookie in
+	if cookie_id = save_cookie_id && cookie_time = save_time && user_id = save_user_id && cookie_key = save_cookie_key then
+
+	out(c, AppData);
+
+	(* transfer response *)
+	in(c, (response: bitstring, server_certificate: bitstring));
+	let(transferred_response: bitstring) = response in
+	let(transferred_server_certificate: bitstring) = server_certificate in
+	out(c, (transferred_response, transferred_server_certificate)).
+
+(************************************************************************)
+(* Server Process *)
+
+let processServer(server_certificate: bitstring) = 
+	
+	(* response to client *)
+	in(c, AppData: bitstring);
+
+	(* out response *)
+	new response: bitstring;
+	out(c, (response, server_certificate));
+
+	(* begin queries: query 2 and 3 *)
+	event beginResponseVerif(response);
+	event beginServerVerif(server_certificate).
+
+
+(************************************************************************)
+(* Certificate Authority (CA) process *)
+
+let processCA(skCA: bitstring) =
+      in(c, (HostInfoX: bitstring, pkX: bitstring));
+      if HostInfoX <> HostInfoC && 
+         HostInfoX <> HostInfoS &&
+         HostInfoX <> HostInfoCA then 
+      let signCA_pkX = sign(H((HostInfoCA, HostInfoX, pkX)), skCA) in 
+      let X_certificate = (HostInfoCA, HostInfoX, pkX, signCA_pkX) in
+      out(c, X_certificate).
+
+(************************************************************************)
+(* Main Process *)
+
+process
+	new cur_time: bitstring;
+    (* Certificate Authority (CA) : skCA, pkCA *)
+     new skCA: bitstring;
+     let pkCA = pk(skCA) in
+     out(c, pkCA);
+     (* Server cookie_key : skS, pkS *)
+     new skS: bitstring;
+     let pkS = pk(skS) in
+     (* (Server) Certificate *)
+     let signCA_pkS = sign(H((HostInfoCA, HostInfoS, pkS)), skCA) in 
+     let server_certificate = (HostInfoCA, HostInfoS, pkS, signCA_pkS) in
+
+	((!processClient(cur_time)) |
+	 (!processCookieServer(cur_time)) | 
+	 (!processMiddleBox()) |
+	 (!processServer(server_certificate)) |
+	 (!processCA(skCA)))
+
+(************************************************************************)
+(* file end *)

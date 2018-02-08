@@ -1,0 +1,125 @@
+Waf: Entering directory `/home/ovsdev/Downloads/ns-allinone-3.26/ns-3.26/build'
+[2262/2669] Compiling scratch/lena-x2-handover-measures-ipv421.cc
+[2596/2669] Linking build/scratch/lena-x2-handover-measures-ipv421
+Waf: Leaving directory `/home/ovsdev/Downloads/ns-allinone-3.26/ns-3.26/build'
+Build commands will be stored in build/compile_commands.json
+'build' finished successfully (5.658s)
+0s -1 EpcX2:EpcX2(0x2064730)
+0s -1 EpcX2:SetEpcX2SapUser(0x2064730, 0x205da00)
+0s -1 EpcX2:GetEpcX2SapProvider(0x2064730)
+0s -1 EpcX2:EpcX2(0x206d5a0)
+0s -1 EpcX2:SetEpcX2SapUser(0x206d5a0, 0x2066b60)
+0s -1 EpcX2:GetEpcX2SapProvider(0x206d5a0)
+0s -1 EpcX2:AddX2Interface(0x2064730, 1, 12.0.0.5, 2, 12.0.0.6)
+0s -1 EpcX2:AddX2Interface(0x206d5a0, 2, 12.0.0.6, 1, 12.0.0.5)
+/NodeList/4/DeviceList/0/LteUeRrc/ConnectionEstablished UE IMSI 1: connected to CellId 1 with RNTI 1
+/NodeList/2/DeviceList/0/LteEnbRrc/ConnectionEstablished eNB CellId 1: successful connection of UE with IMSI 1 RNTI 1
+19.48s -1 EpcX2:DoSendHandoverRequest(0x2064730)
+19.48s -1 EpcX2:DoSendHandoverRequest(): [LOGIC] oldEnbUeX2apId = 1
+19.48s -1 EpcX2:DoSendHandoverRequest(): [LOGIC] sourceCellId = 1
+19.48s -1 EpcX2:DoSendHandoverRequest(): [LOGIC] targetCellId = 2
+19.48s -1 EpcX2:DoSendHandoverRequest(): [LOGIC] mmeUeS1apId  = 1
+19.48s -1 EpcX2:DoSendHandoverRequest(): [LOGIC] sourceSocket = 0x2077b00
+19.48s -1 EpcX2:DoSendHandoverRequest(): [LOGIC] targetIpAddr = 12.0.0.6
+19.48s -1 EpcX2:DoSendHandoverRequest(): [INFO ] Send X2 message: HANDOVER REQUEST
+19.48s -1 EpcX2:DoSendHandoverRequest(): [INFO ] X2 header: MessageType=0 ProcedureCode=0 LengthOfIEs=146 NumberOfIEs=4
+19.48s -1 EpcX2:DoSendHandoverRequest(): [INFO ] X2 HandoverRequest header: OldEnbUeX2apId = 1 Cause = 0 TargetCellId = 2 MmeUeS1apId = 1 UeAggrMaxBitRateDownlink = 200000 UeAggrMaxBitRateUplink = 100000 NumOfBearers = 2 [1, 2]
+19.48s -1 EpcX2:DoSendHandoverRequest(): [INFO ] packetLen = 157
+19.48s 3 EpcX2:RecvFromX2cSocket(0x206d5a0, 0x20783f0)
+19.48s 3 EpcX2:RecvFromX2cSocket(): [LOGIC] Recv X2 message: from Socket
+19.48s 3 EpcX2:RecvFromX2cSocket(): [LOGIC] packetLen = 157
+19.48s 3 EpcX2:RecvFromX2cSocket(): [LOGIC] X2 header: MessageType=0 ProcedureCode=0 LengthOfIEs=146 NumberOfIEs=4
+19.48s 3 EpcX2:RecvFromX2cSocket(): [LOGIC] Recv X2 message: HANDOVER REQUEST
+19.48s 3 EpcX2:RecvFromX2cSocket(): [INFO ] X2 HandoverRequest header: OldEnbUeX2apId = 1 Cause = 0 TargetCellId = 2 MmeUeS1apId = 1 UeAggrMaxBitRateDownlink = 200000 UeAggrMaxBitRateUplink = 100000 NumOfBearers = 2 [1, 2]
+19.48s 3 EpcX2:RecvFromX2cSocket(): [LOGIC] oldEnbUeX2apId = 1
+19.48s 3 EpcX2:RecvFromX2cSocket(): [LOGIC] sourceCellId = 1
+19.48s 3 EpcX2:RecvFromX2cSocket(): [LOGIC] targetCellId = 2
+19.48s 3 EpcX2:RecvFromX2cSocket(): [LOGIC] mmeUeS1apId = 1
+19.48s 3 EpcX2:RecvFromX2cSocket(): [LOGIC] cellsInfo->m_localCellId = 2
+19.48s 3 EpcX2:DoSendHandoverRequestAck(0x206d5a0)
+19.48s 3 EpcX2:DoSendHandoverRequestAck(): [LOGIC] oldEnbUeX2apId = 1
+19.48s 3 EpcX2:DoSendHandoverRequestAck(): [LOGIC] newEnbUeX2apId = 1
+19.48s 3 EpcX2:DoSendHandoverRequestAck(): [LOGIC] sourceCellId = 1
+19.48s 3 EpcX2:DoSendHandoverRequestAck(): [LOGIC] targetCellId = 2
+19.48s 3 EpcX2:DoSendHandoverRequestAck(): [LOGIC] localSocket = 0x20783f0
+19.48s 3 EpcX2:DoSendHandoverRequestAck(): [LOGIC] remoteIpAddr = 12.0.0.5
+19.48s 3 EpcX2:DoSendHandoverRequestAck(): [INFO ] Send X2 message: HANDOVER REQUEST ACK
+19.48s 3 EpcX2:DoSendHandoverRequestAck(): [INFO ] X2 header: MessageType=1 ProcedureCode=0 LengthOfIEs=32 NumberOfIEs=4
+19.48s 3 EpcX2:DoSendHandoverRequestAck(): [INFO ] X2 HandoverAck header: OldEnbUeX2apId=1 NewEnbUeX2apId=1 AdmittedBearers=2 [1, 2] NotAdmittedBearers=0
+19.48s 3 EpcX2:DoSendHandoverRequestAck(): [INFO ] RRC context: 0x2122030
+19.48s 3 EpcX2:DoSendHandoverRequestAck(): [INFO ] packetLen = 43
+19.48s 2 EpcX2:RecvFromX2cSocket(0x2064730, 0x2077b00)
+19.48s 2 EpcX2:RecvFromX2cSocket(): [LOGIC] Recv X2 message: from Socket
+19.48s 2 EpcX2:RecvFromX2cSocket(): [LOGIC] packetLen = 43
+19.48s 2 EpcX2:RecvFromX2cSocket(): [LOGIC] X2 header: MessageType=1 ProcedureCode=0 LengthOfIEs=32 NumberOfIEs=4
+19.48s 2 EpcX2:RecvFromX2cSocket(): [LOGIC] Recv X2 message: HANDOVER REQUEST ACK
+19.48s 2 EpcX2:RecvFromX2cSocket(): [INFO ] X2 HandoverRequestAck header: OldEnbUeX2apId=1 NewEnbUeX2apId=1 AdmittedBearers=2 [1, 2] NotAdmittedBearers=0
+19.48s 2 EpcX2:RecvFromX2cSocket(): [LOGIC] oldEnbUeX2apId = 1
+19.48s 2 EpcX2:RecvFromX2cSocket(): [LOGIC] newEnbUeX2apId = 1
+19.48s 2 EpcX2:RecvFromX2cSocket(): [LOGIC] sourceCellId = 1
+19.48s 2 EpcX2:RecvFromX2cSocket(): [LOGIC] targetCellId = 2
+/NodeList/2/DeviceList/0/LteEnbRrc/HandoverStart eNB CellId 1: start handover of UE with IMSI 1 RNTI 1 to CellId 2
+19.48s 2 EpcX2:DoSendSnStatusTransfer(0x2064730)
+19.48s 2 EpcX2:DoSendSnStatusTransfer(): [LOGIC] oldEnbUeX2apId = 1
+19.48s 2 EpcX2:DoSendSnStatusTransfer(): [LOGIC] newEnbUeX2apId = 1
+19.48s 2 EpcX2:DoSendSnStatusTransfer(): [LOGIC] sourceCellId = 1
+19.48s 2 EpcX2:DoSendSnStatusTransfer(): [LOGIC] targetCellId = 2
+19.48s 2 EpcX2:DoSendSnStatusTransfer(): [LOGIC] erabsList size = 0
+19.48s 2 EpcX2:DoSendSnStatusTransfer(): [LOGIC] localSocket = 0x2077b00
+19.48s 2 EpcX2:DoSendSnStatusTransfer(): [LOGIC] remoteIpAddr = 12.0.0.6
+19.48s 2 EpcX2:DoSendSnStatusTransfer(): [INFO ] Send X2 message: SN STATUS TRANSFER
+19.48s 2 EpcX2:DoSendSnStatusTransfer(): [INFO ] X2 header: MessageType=0 ProcedureCode=4 LengthOfIEs=6 NumberOfIEs=3
+19.48s 2 EpcX2:DoSendSnStatusTransfer(): [INFO ] X2 SnStatusTransfer header: OldEnbUeX2apId = 1 NewEnbUeX2apId = 1 ErabsSubjectToStatusTransferList size = 0
+19.48s 2 EpcX2:DoSendSnStatusTransfer(): [INFO ] packetLen = 13
+/NodeList/4/DeviceList/0/LteUeRrc/HandoverStart UE IMSI 1: previously connected to CellId 1 with RNTI 1, doing handover to CellId 2
+19.48s 3 EpcX2:RecvFromX2cSocket(0x206d5a0, 0x20783f0)
+19.48s 3 EpcX2:RecvFromX2cSocket(): [LOGIC] Recv X2 message: from Socket
+19.48s 3 EpcX2:RecvFromX2cSocket(): [LOGIC] packetLen = 13
+19.48s 3 EpcX2:RecvFromX2cSocket(): [LOGIC] X2 header: MessageType=0 ProcedureCode=4 LengthOfIEs=6 NumberOfIEs=3
+19.48s 3 EpcX2:RecvFromX2cSocket(): [LOGIC] Recv X2 message: SN STATUS TRANSFER
+19.48s 3 EpcX2:RecvFromX2cSocket(): [INFO ] X2 SnStatusTransfer header: OldEnbUeX2apId = 1 NewEnbUeX2apId = 1 ErabsSubjectToStatusTransferList size = 0
+19.48s 3 EpcX2:RecvFromX2cSocket(): [LOGIC] oldEnbUeX2apId = 1
+19.48s 3 EpcX2:RecvFromX2cSocket(): [LOGIC] newEnbUeX2apId = 1
+19.48s 3 EpcX2:RecvFromX2cSocket(): [LOGIC] sourceCellId = 1
+19.48s 3 EpcX2:RecvFromX2cSocket(): [LOGIC] targetCellId = 2
+19.48s 3 EpcX2:RecvFromX2cSocket(): [LOGIC] erabsList size = 0
+/NodeList/4/DeviceList/0/LteUeRrc/HandoverEndOk UE IMSI 1: successful handover to CellId 2 with RNTI 1
+19.4842s 4 EpcX2:DoSendUeContextRelease(0x206d5a0)
+19.4842s 4 EpcX2:DoSendUeContextRelease(): [LOGIC] oldEnbUeX2apId = 1
+19.4842s 4 EpcX2:DoSendUeContextRelease(): [LOGIC] newEnbUeX2apId = 1
+19.4842s 4 EpcX2:DoSendUeContextRelease(): [LOGIC] sourceCellId = 1
+19.4842s 4 EpcX2:DoSendUeContextRelease(): [LOGIC] localSocket = 0x20783f0
+19.4842s 4 EpcX2:DoSendUeContextRelease(): [LOGIC] remoteIpAddr = 12.0.0.5
+19.4842s 4 EpcX2:DoSendUeContextRelease(): [INFO ] Send X2 message: UE CONTEXT RELEASE
+19.4842s 4 EpcX2:DoSendUeContextRelease(): [INFO ] X2 header: MessageType=0 ProcedureCode=5 LengthOfIEs=4 NumberOfIEs=2
+19.4842s 4 EpcX2:DoSendUeContextRelease(): [INFO ] X2 UeContextRelease header: OldEnbUeX2apId=1 NewEnbUeX2apId=1
+19.4842s 4 EpcX2:DoSendUeContextRelease(): [INFO ] packetLen = 11
+/NodeList/3/DeviceList/0/LteEnbRrc/HandoverEndOk eNB CellId 2: completed handover of UE with IMSI 1 RNTI 1
+19.4842s 2 EpcX2:RecvFromX2cSocket(0x2064730, 0x2077b00)
+19.4842s 2 EpcX2:RecvFromX2cSocket(): [LOGIC] Recv X2 message: from Socket
+19.4842s 2 EpcX2:RecvFromX2cSocket(): [LOGIC] packetLen = 11
+19.4842s 2 EpcX2:RecvFromX2cSocket(): [LOGIC] X2 header: MessageType=0 ProcedureCode=5 LengthOfIEs=4 NumberOfIEs=2
+19.4842s 2 EpcX2:RecvFromX2cSocket(): [LOGIC] Recv X2 message: UE CONTEXT RELEASE
+19.4842s 2 EpcX2:RecvFromX2cSocket(): [INFO ] X2 UeContextRelease header: OldEnbUeX2apId=1 NewEnbUeX2apId=1
+19.4842s 2 EpcX2:RecvFromX2cSocket(): [LOGIC] oldEnbUeX2apId = 1
+19.4842s 2 EpcX2:RecvFromX2cSocket(): [LOGIC] newEnbUeX2apId = 1
+EpcX2:DoDispose(0x2064730)
+EpcX2:DoDispose(0x206d5a0)
+EpcX2:~EpcX2(0x2064730)
+EpcX2:~EpcX2(0x206d5a0)
+Flow 1 (1.0.0.2 -> 7.0.0.2)
+  Tx Bytes:   3943948
+  Rx Bytes:   3940792
+  Throughput: 3.00659 Mbps
+Flow 2 (7.0.0.2 -> 1.0.0.2)
+  Tx Bytes:   3943948
+  Rx Bytes:   3937636
+  Throughput: 3.00418 Mbps
+Flow 3 (12.0.0.5 -> 12.0.0.6)
+  Tx Bytes:   226
+  Rx Bytes:   226
+  Throughput: 0.000172424 Mbps
+Flow 4 (12.0.0.6 -> 12.0.0.5)
+  Tx Bytes:   110
+  Rx Bytes:   110
+  Throughput: 8.39233e-05 Mbps

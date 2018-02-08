@@ -1,0 +1,572 @@
+free c: channel.    (* control plane channel *)
+free d: channel.    (* data plane channel *)
+
+
+(* Null, Empty: const. *)
+const null: bitstring [data].
+const empty: bitstring [data].
+
+(* ServerConfiguration: const. *)
+const early_data_type: bitstring [data].
+
+(* HMAC: const. *)
+const hmac_opad: bitstring [data].
+const hmac_ipad: bitstring [data].
+
+(* HKDF: const. *)
+const hkdf_zeros: bitstring [data]. 
+(* HKDF: label *)
+const HKDF_SERVER_FINISHED: bitstring [data].
+const HKDF_CLIENT_FINISHED: bitstring [data].
+const HKDF_LABAL_EXPANDED_STATIC_SECRET: bitstring [data].
+const HKDF_LABEL_EXPANDED_EPHEMERAL_SECRET: bitstring [data].
+const HKDF_LABEL_FINISHED_SECRET: bitstring [data].
+const HKDF_LABEL_TRAFFIC_SECRET: bitstring [data].
+(*
+const HKDF_LABEL_RESUMPTION_MASTER_SECRET: bitstring [data].
+const HKDF_LABEL_EXPORTER_MASTER_SECRET: bitstring [data].
+*)
+(* HKDF: const. - label (Phase) *)
+(*
+const HKDF_LABEL_EARLY_HANDSHAKE_KEY_EXPANSION: bitstring [data].
+const HKDF_LABEL_EARLY_APPLICATION_DATA_KEY_EXPANSION: bitstring [data].
+*)
+const HKDF_LABEL_HANDSHAKE_KEY_EXPANSION: bitstring [data].
+const HKDF_LABEL_APPLICATION_DATA_KEY_EXPANSION: bitstring [data].
+(* HKDF: const. - label (Purpose) *)
+const HKDF_LABEL_CLIENT_WRITE_KEY: bitstring [data].
+const HKDF_LABEL_SERVER_WRITE_KEY: bitstring [data].
+const HKDF_LABEL_CLIENT_WRITE_IV: bitstring [data].
+const HKDF_LABEL_SERVER_WRITE_IV: bitstring [data].
+(* HKDF: const. - length *)
+const hkdf_length_mss: bitstring [data].
+const hkdf_length_mes: bitstring [data].
+const hkdf_length_client_finished_key: bitstring [data].
+const hkdf_length_server_finished_key: bitstring [data].
+(* HKDF: const. - length (Handshake) *)
+const hkdf_length_handshake_client_write_key: bitstring [data].
+const hkdf_length_handshake_server_write_key: bitstring [data].
+const hkdf_length_handshake_client_write_IV: bitstring [data].
+const hkdf_length_handshake_server_write_IV: bitstring [data].
+(* HKDF: const. - length (Application) *)
+const hkdf_length_application_client_write_key: bitstring [data].
+const hkdf_length_application_server_write_key: bitstring [data].
+const hkdf_length_application_client_write_IV: bitstring [data].
+const hkdf_length_application_server_write_IV: bitstring [data].
+const hkdf_length_traffic_secret: bitstring [data].
+
+(* AEAD: const. *)
+const client_seq_num: bitstring  [data].
+const server_seq_num: bitstring  [data].
+const record_type: bitstring  [data].
+const record_version: bitstring  [data].
+
+(* Host Information *)
+free HostInfoC, HostInfoS, HostInfoCA: bitstring.
+
+
+(******************************************************************)
+(* Hash *)
+fun H(bitstring): bitstring.
+
+(* HMAC *)
+reduc forall key: bitstring, text: bitstring; 
+      HMAC(key, text) = H(( (key, hmac_opad), H(((key, hmac_ipad), text)) )).
+
+(* HKDF *)
+reduc forall salt: bitstring, IKM: bitstring;
+      HKDF_Extract(salt, IKM) = H(( (salt, hmac_opad), H(((salt, hmac_ipad), IKM)) )). (* HKDF-extract *)
+
+reduc forall PRK: bitstring, info: bitstring, L: bitstring;
+      HKDF_Expand(PRK, info, L) = H(( (PRK, hmac_opad), H(((PRK, hmac_ipad), (info, L))) )). (* HKDF-expand *)
+
+(* Signature *)
+fun sign(bitstring, bitstring): bitstring.
+fun pk(bitstring): bitstring.
+  reduc forall x: bitstring, sk: bitstring; verify(sign(x, sk), x, pk(sk)) = true.
+
+(* Diffie-Hellman *)
+const g: bitstring.
+fun exp(bitstring, bitstring): bitstring. (* exp(g,x) = g^x *)
+  equation forall x: bitstring, y: bitstring; exp(exp(g, x), y) = exp(exp(g, y), x). (* (g^x)^y = (g^y)^x *)
+
+(* XOR *)
+const zeros: bitstring. (* 00..0 *)
+fun xor(bitstring,bitstring):bitstring.
+  equation forall x:bitstring,y:bitstring; xor(xor(x,y),y) = x.
+  equation forall x:bitstring; xor(x,x) = zeros.  (* xor(x,x) = 00..0 *)
+  equation forall x:bitstring; xor(zeros,x) = x.  (* xor(00..0,x) = x *)
+  equation forall x:bitstring; xor(x,zeros) = x.  (* xor(x,00..0) = x *)
+
+(* AEAD: Authenticated Encryption with Associated Data *)
+(* Encryption scheme *)
+fun encrypt(bitstring, bitstring, bitstring): bitstring.
+  reduc forall x:bitstring, k:bitstring, r:bitstring; decrypt(encrypt(x,k,r),k,r) = x.
+(* MAC *)
+fun mac(bitstring, bitstring): bitstring.
+  reduc forall x: bitstring, k: bitstring; verify_mac(mac(x, k), x, k) = true.
+(* Encrypt-then-MAC (generic composition)[R02] *)
+(* [R02] P.Rogaway, "Authenticated-encryption with associated-data,"
+   ACM Conference on Computer and Communications Security (CCS'02), 
+   pp.98-107, ACM press, 2002 *)
+reduc forall k: bitstring, n: bitstring, p:bitstring, ad:bitstring; 
+  AEAD_Encrypt(k, n, p, ad) = (encrypt(p, k, n), mac((n, ad, encrypt(p, k, n)), k)).
+reduc forall k: bitstring, n: bitstring, p:bitstring, ad:bitstring; 
+  AEAD_Decrypt(k, n, (encrypt(p, k, n), mac((n, ad, encrypt(p, k, n)), k)), ad) = p.
+
+(* Asymmetric key encryption *)
+
+fun aenc(bitstring, bitstring): bitstring.
+reduc forall m: bitstring, sk: bitstring; adec(aenc(m,pk(sk)),sk) = m.
+
+(* increment function *)
+fun inc(bitstring): bitstring.
+
+
+(******************************************************************)
+
+(* Query: verify integrity of the source IP  *)
+event endIPVerify(bitstring, bitstring, bitstring, bitstring).
+event beginIPVerify(bitstring, bitstring, bitstring, bitstring).
+
+query a: bitstring, b: bitstring, c: bitstring, d: bitstring;
+event(endIPVerify(a, b, c, d)) ==> event(beginIPVerify(a, b, c, d)).
+
+(******************************************************************)
+(* ISP assistant process *)
+
+(*** in here, the client is the ISP assistant ***)
+
+
+(***  Step 0 TLS Setup ***)
+
+let processClient(pkCA: bitstring)=
+    (* Setup *)
+      in(c, (client_version: bitstring, client_cipher_suites: bitstring, 
+             legacy_compression_methods: bitstring));
+
+    (* ClientHello + key_share *)
+      new client_random: bitstring;
+      new client_legacy_session_id: bitstring;
+      new X: bitstring; 
+      let client_key_shares = exp(g, X) in  (* g^X *)
+      let client_hello = (client_version, client_random, client_legacy_session_id, 
+                          client_cipher_suites, legacy_compression_methods, 
+                          client_key_shares) in
+    (* Client output *)
+      out(c, client_hello);
+
+    (* Client input *)
+      in(c, (server_hello: bitstring, enc_encrypted_extensions: bitstring, 
+             enc_server_configuration: bitstring, enc_server_certificate: bitstring, 
+             enc_server_certificate_verify: bitstring, enc_server_finished: bitstring));
+      let (server_version: bitstring, server_random: bitstring, 
+           server_cipher_suite: bitstring, server_key_share: bitstring) = server_hello in 
+
+      if server_version = client_version &&
+         server_cipher_suite = client_cipher_suites then 
+
+    (* SS, ES, xSS, xES *) (* Full handshake: SS = ES *)
+      let static_secret = exp(server_key_share, X) in     (* SS: (g^{Y})^X = g^{XY} *)
+      let ephemeral_secret = exp(server_key_share, X) in  (* ES: (g^{Y})^X = g^{XY} *)
+      let xss = HKDF_Extract(hkdf_zeros, static_secret) in
+      let xes = HKDF_Extract(hkdf_zeros, ephemeral_secret) in
+
+    (* Handshake traffic keys: client_write_key, server_write_key, 
+                               client_write_iv, server_write_iv *)
+      let handshake_context = H((client_hello, server_hello)) in
+
+      let handshake_client_write_key = HKDF_Expand(
+      	      xes, 
+	      ((HKDF_LABEL_HANDSHAKE_KEY_EXPANSION, HKDF_LABEL_CLIENT_WRITE_KEY), handshake_context), 
+	      hkdf_length_handshake_client_write_key) in
+
+      let handshake_server_write_key = HKDF_Expand(
+      	      xes, 
+	      ((HKDF_LABEL_HANDSHAKE_KEY_EXPANSION, HKDF_LABEL_SERVER_WRITE_KEY), handshake_context), 
+	      hkdf_length_handshake_server_write_key) in
+
+      let handshake_client_write_iv = HKDF_Expand(
+      	      xes, 
+	      ((HKDF_LABEL_HANDSHAKE_KEY_EXPANSION, HKDF_LABEL_CLIENT_WRITE_IV), handshake_context), 
+	      hkdf_length_handshake_client_write_IV) in
+
+      let handshake_server_write_iv = HKDF_Expand(
+      	      xes, 
+	      ((HKDF_LABEL_HANDSHAKE_KEY_EXPANSION, HKDF_LABEL_SERVER_WRITE_IV), handshake_context), 
+	      hkdf_length_handshake_server_write_IV) in
+
+    (* Decryption: encrypted_extensions, server_configuration, server_certificate, 
+                   server_certificate_verify, server_finished *)
+      (* AEAD: additional_data = empty *)
+      let handshake_server_write_nonce_0 = xor(handshake_server_write_iv, 
+                                               server_seq_num) in
+      let (encrypted_extensions:bitstring, =record_type) = AEAD_Decrypt(
+      	      handshake_server_write_key, 
+      	      handshake_server_write_nonce_0, 
+	      enc_encrypted_extensions, 
+	      empty) in 
+
+      let handshake_server_write_nonce_1 = xor(handshake_server_write_iv, 
+                                               inc(server_seq_num)) in
+      let (server_configuration:bitstring, =record_type) = AEAD_Decrypt(
+      	      handshake_server_write_key, 
+      	      handshake_server_write_nonce_1, 
+	      enc_server_configuration, 
+	      empty) in 
+
+      let handshake_server_write_nonce_2 = xor(handshake_server_write_iv, 
+                                               inc(inc(server_seq_num))) in
+      let (server_certificate:bitstring, =record_type) = AEAD_Decrypt(
+      	      handshake_server_write_key, 
+      	      handshake_server_write_nonce_2, 
+	      enc_server_certificate, 
+	      empty) in 
+
+      let handshake_server_write_nonce_3 = xor(handshake_server_write_iv, 
+                                               inc(inc(inc(server_seq_num)))) in
+      let (server_certificate_verify:bitstring, =record_type) = AEAD_Decrypt(
+      	      handshake_server_write_key, 
+	      handshake_server_write_nonce_3, 
+	      enc_server_certificate_verify, 
+	      empty) in 
+
+      let handshake_server_write_nonce_4 = xor(handshake_server_write_iv, 
+                                               inc(inc(inc(inc(server_seq_num))))) in
+      let (server_finished:bitstring, =record_type) = AEAD_Decrypt(
+      	      handshake_server_write_key, 
+	      handshake_server_write_nonce_4, 
+	      enc_server_finished, 
+	      empty) in 
+
+      if encrypted_extensions = empty then 
+
+      let (=HostInfoCA, =HostInfoS, pkS: bitstring, signCA_pkS: bitstring) = server_certificate in 
+      if verify(signCA_pkS, H((HostInfoCA, HostInfoS, pkS)), pkCA) = true then 
+
+      let handshake_hashed_data = H((client_hello, server_hello, encrypted_extensions, 
+                                     server_configuration, server_certificate)) in 
+      if verify(server_certificate_verify, handshake_hashed_data, pkS) = true then 
+
+    (* mSS, mES, master_secret, traffic_secret_0 *) 
+      let handshake_hash = H((client_hello, server_hello, encrypted_extensions,
+                              server_configuration, server_certificate, 
+                              server_certificate_verify)) in
+      let mss = HKDF_Expand(
+      	      xss, 
+	      (HKDF_LABAL_EXPANDED_STATIC_SECRET, handshake_hash), 
+	      hkdf_length_mss) in
+      let mes = HKDF_Expand(
+      	      xes, 
+	      (HKDF_LABEL_EXPANDED_EPHEMERAL_SECRET, handshake_hash), 
+	      hkdf_length_mes) in
+      let master_secret = HKDF_Extract(mss, mes) in 
+      let traffic_secret_0 = HKDF_Expand(
+      	      master_secret, 
+	      (HKDF_LABEL_TRAFFIC_SECRET, handshake_hash), 
+	      hkdf_length_traffic_secret) in
+
+      let server_finished_handshake_context = H((client_hello, server_hello, encrypted_extensions,
+                                                 server_configuration, server_certificate, 
+                                                 server_certificate_verify)) in
+      let server_finished_key = HKDF_Expand(
+      	      master_secret, 
+	      (HKDF_SERVER_FINISHED, empty), 
+	      hkdf_length_server_finished_key) in
+      if server_finished = HMAC(server_finished_key, server_finished_handshake_context) then
+
+    (* Certificate: optional *)
+      (* Omitted *)
+    (* CertificateVerify: optional *)
+      (* Omitted *)
+
+    (* Finished *) (* 1-RTT (Client) *)
+      let client_finished_handshake_context = H((client_hello, server_hello, encrypted_extensions,
+                                                 server_configuration, server_certificate, 
+                                                 server_certificate_verify, server_finished)) in
+      let client_finished_key = HKDF_Expand(
+      	      master_secret, 
+	      (HKDF_CLIENT_FINISHED, empty), 
+	      hkdf_length_client_finished_key) in
+      let client_finished = HMAC(client_finished_key, client_finished_handshake_context) in
+
+    (* Encryption: client_finished *)
+      let handshake_client_write_nonce_0 = xor(handshake_client_write_iv, 
+                                               client_seq_num) in
+      let enc_client_finished = AEAD_Encrypt(
+      	      handshake_client_write_key, 
+	      handshake_client_write_nonce_0, 
+	      (client_finished, record_type), 
+	      empty) in  
+
+    (* Client output *)
+      out(c, enc_client_finished);
+
+
+      in(c, enc_ResponsePacket: bitstring);
+      out(c, (enc_ResponsePacket, client_finished_key));
+
+
+    (* Application data traffic keys: client_write_key, server_write_key, 
+                                      client_write_iv, server_write_iv *)
+      0.
+
+(******************************************************************)
+(* Normal Server process *)
+
+(*** in here, the Server is the Server Agent ***)
+
+
+let processServerA(skS: bitstring, pkS: bitstring, server_certificate: bitstring, pkCA: bitstring, pkB: bitstring) =
+    (* Setup *)
+      in(c, (server_version: bitstring, server_cipher_suite: bitstring));
+
+    (* Server input *)
+      in(c, client_hello: bitstring);
+      let (client_version: bitstring, client_random: bitstring, client_legacy_session_id: bitstring,
+           client_cipher_suites: bitstring, legacy_compression_methods: bitstring, 
+           client_key_shares: bitstring) = client_hello in
+
+      if client_version = server_version &&
+         client_cipher_suites = server_cipher_suite &&
+         legacy_compression_methods = null then 
+
+    (* ServerHello + key_share *)
+      new server_random: bitstring;
+      new Y: bitstring;
+      let server_key_share = exp(g, Y) in  (* g^Y *)
+      let server_hello = (server_version, server_random, server_cipher_suite, server_key_share) in 
+
+    (* SS, ES, xSS, xES *) (* Full handshake: SS = ES *)
+      let static_secret = exp(client_key_shares, Y) in     (* SS: (g^{X})^Y = g^{XY} *)
+      let ephemeral_secret = exp(client_key_shares, Y) in  (* ES: (g^{X})^Y = g^{XY} *)
+      let xss = HKDF_Extract(hkdf_zeros, static_secret) in
+      let xes = HKDF_Extract(hkdf_zeros, ephemeral_secret) in
+
+    (* Handshake traffic keys: client_write_key, server_write_key, 
+                               client_write_iv, server_write_iv *)
+      let handshake_context = H((client_hello, server_hello)) in
+
+      let handshake_client_write_key = HKDF_Expand(
+      	      xes, 
+	      ((HKDF_LABEL_HANDSHAKE_KEY_EXPANSION, HKDF_LABEL_CLIENT_WRITE_KEY), handshake_context), 
+	      hkdf_length_handshake_client_write_key) in
+
+      let handshake_server_write_key = HKDF_Expand(
+      	      xes, 
+	      ((HKDF_LABEL_HANDSHAKE_KEY_EXPANSION, HKDF_LABEL_SERVER_WRITE_KEY), handshake_context), 
+	      hkdf_length_handshake_server_write_key) in
+
+      let handshake_client_write_iv = HKDF_Expand(
+      	      xes, 
+	      ((HKDF_LABEL_HANDSHAKE_KEY_EXPANSION, HKDF_LABEL_CLIENT_WRITE_IV), handshake_context), 
+	      hkdf_length_handshake_client_write_IV) in
+
+      let handshake_server_write_iv = HKDF_Expand(
+      	      xes, 
+	      ((HKDF_LABEL_HANDSHAKE_KEY_EXPANSION, HKDF_LABEL_SERVER_WRITE_IV), handshake_context), 
+	      hkdf_length_handshake_server_write_IV) in
+
+    (* EncryptedExtensions *)
+      let encrypted_extensions = empty in 
+
+    (* CertificateRequest: optional *)
+      (* Omitted *)
+
+    (* ServerConfiguration: optional *) 
+      new configuration_id: bitstring;
+      new expiration_date: bitstring;
+      let static_key_share = server_key_share in 
+      let server_configuration = (configuration_id, expiration_date, static_key_share, 
+                                  early_data_type) in 
+
+    (* Certificate: optional *)
+      (* Main process *)
+
+    (* CertificateVerify: optional *)
+      let handshake_hashed_data = H((client_hello, server_hello, encrypted_extensions,
+                                     server_configuration, server_certificate)) in 
+      let server_certificate_verify = sign(handshake_hashed_data, skS) in 
+
+    (* mSS, mES, master_secret, traffic_secret_0 *) 
+      let handshake_hash = H((client_hello, server_hello, encrypted_extensions,
+                              server_configuration, server_certificate, 
+                              server_certificate_verify)) in
+      let mss = HKDF_Expand(
+      	      xss, 
+	      (HKDF_LABAL_EXPANDED_STATIC_SECRET, handshake_hash), 
+	      hkdf_length_mss) in
+      let mes = HKDF_Expand(
+      	      xes, 
+	      (HKDF_LABEL_EXPANDED_EPHEMERAL_SECRET, handshake_hash), 
+	      hkdf_length_mes) in
+      let master_secret = HKDF_Extract(mss, mes) in 
+      let traffic_secret_0 = HKDF_Expand(
+      	      master_secret, 
+	      (HKDF_LABEL_TRAFFIC_SECRET, handshake_hash), 
+	      hkdf_length_traffic_secret) in
+
+    (* Finished *) (* 1-RTT (Server) *)
+      let server_finished_handshake_context = H((client_hello, server_hello, encrypted_extensions,
+                                                 server_configuration, server_certificate, 
+                                                 server_certificate_verify)) in
+      let server_finished_key = HKDF_Expand(
+      	      master_secret, 
+	      (HKDF_SERVER_FINISHED, empty), 
+	      hkdf_length_server_finished_key) in
+      let server_finished = HMAC(server_finished_key, server_finished_handshake_context) in
+
+    (* Encryption: encrypted_extensions, server_configuration, server_certificate, 
+                   server_certificate_verify, server_finished *)
+      (* AEAD: additional_data = empty *)
+      let handshake_server_write_nonce_0 = xor(handshake_server_write_iv, 
+                                               server_seq_num) in
+      let enc_encrypted_extensions = AEAD_Encrypt(
+      	      handshake_server_write_key, 
+      	      handshake_server_write_nonce_0, 
+	      (encrypted_extensions, record_type), 
+	      empty) in 
+
+      let handshake_server_write_nonce_1 = xor(handshake_server_write_iv, 
+                                               inc(server_seq_num)) in
+      let enc_server_configuration = AEAD_Encrypt(
+      	      handshake_server_write_key, 
+      	      handshake_server_write_nonce_1, 
+	      (server_configuration, record_type), 
+	      empty) in 
+
+      let handshake_server_write_nonce_2 = xor(handshake_server_write_iv, 
+                                               inc(inc(server_seq_num))) in
+      let enc_server_certificate = AEAD_Encrypt(
+      	      handshake_server_write_key, 
+      	      handshake_server_write_nonce_2, 
+	      (server_certificate, record_type), 
+	      empty) in 
+
+      let handshake_server_write_nonce_3 = xor(handshake_server_write_iv, 
+                                               inc(inc(inc(server_seq_num)))) in
+      let enc_server_certificate_verify = AEAD_Encrypt(
+      	      handshake_server_write_key, 
+	      handshake_server_write_nonce_3, 
+	      (server_certificate_verify, record_type), 
+	      empty) in 
+
+      let handshake_server_write_nonce_4 = xor(handshake_server_write_iv, 
+                                               inc(inc(inc(inc(server_seq_num))))) in
+      let enc_server_finished = AEAD_Encrypt(
+      	      handshake_server_write_key, 
+	      handshake_server_write_nonce_4, 
+	      (server_finished, record_type), 
+	      empty) in 
+
+    
+    
+    (* quary SA side 2.1 Event begin: authentication   2.1 SA side *)
+      (*event beginClient(client_random, server_random, server_cipher_suite, xes, traffic_secret_0);  *)
+
+
+(*  !!!read this carefully again to make sure no change!!!!!!! *)
+    (* Server output *)
+      out(c, (server_hello, enc_encrypted_extensions, enc_server_configuration, 
+              enc_server_certificate, enc_server_certificate_verify, enc_server_finished));
+
+    (* Server input *)
+      in(c, enc_client_finished: bitstring);
+
+    (* Decryption: client_finished *)
+      let handshake_client_write_nonce_0 = xor(handshake_client_write_iv, 
+                                               client_seq_num) in
+      let (client_finished:bitstring, =record_type) = AEAD_Decrypt(
+      	      handshake_client_write_key, 
+	      handshake_client_write_nonce_0, 
+	      enc_client_finished, 
+	      empty) in 
+
+      let client_finished_handshake_context = H((client_hello, server_hello, encrypted_extensions,
+                                                 server_configuration, server_certificate, 
+                                                 server_certificate_verify, server_finished)) in
+      let client_finished_key = HKDF_Expand(
+      	      master_secret, 
+	      (HKDF_CLIENT_FINISHED, empty), 
+	      hkdf_length_client_finished_key) in
+      if client_finished = HMAC(client_finished_key, client_finished_handshake_context) then
+
+
+
+
+
+    (*** Above is to get the correct HMAC ***)
+
+    (*** Now sharing IP-relevant packets ***)
+
+    in(c, IP_ServerA: bitstring);
+
+    new Sequence_Number: bitstring;
+    new ACE_Number: bitstring;
+    new Destination_Port: bitstring;
+
+    let ResponsePacket = (Sequence_Number, ACE_Number, Destination_Port, IP_ServerA) in
+    let enc_ResponsePacket = aenc(ResponsePacket, pkB) in 
+    out(c, enc_ResponsePacket);
+
+    event beginIPVerify(Sequence_Number, ACE_Number, Destination_Port, IP_ServerA);
+
+    0.
+
+
+(****************************************************************)
+(* Malicious Server Process *)
+let processServerB(skB: bitstring) =
+    
+    in(c, (enc_ResponsePacket: bitstring, client_finished_key: bitstring));
+
+    let decry_Packet  = adec(enc_ResponsePacket, skB) in
+    let (Received_Sequence_Number: bitstring, Received_ACE_Number: bitstring, Received_Destination_Port: bitstring, Received_IP_Server: bitstring) = decry_Packet in
+
+    event endIPVerify(Received_Sequence_Number, Received_ACE_Number, Received_Destination_Port, Received_IP_Server);
+
+    (* If query *)
+    0.
+
+
+
+(******************************************************************)
+(* Certificate Authority (CA) process *)
+
+let processCA(skCA: bitstring) =
+      in(c, (HostInfoX: bitstring, pkX: bitstring));
+      if HostInfoX <> HostInfoC && 
+         HostInfoX <> HostInfoS &&
+         HostInfoX <> HostInfoCA then 
+      let signCA_pkX = sign(H((HostInfoCA, HostInfoX, pkX)), skCA) in 
+      let X_certificate = (HostInfoCA, HostInfoX, pkX, signCA_pkX) in
+      out(c, X_certificate).
+
+
+(******************************************************************)
+(* Main process *)
+
+process
+    (* Certificate Authority (CA) : skCA, pkCA *)
+      new skCA: bitstring;
+      let pkCA = pk(skCA) in
+      out(c, pkCA);
+    (* Server key : skS, pkS *)
+      new skS: bitstring;
+      let pkS = pk(skS) in 
+    (* (Server) Certificate *)
+      let signCA_pkS = sign(H((HostInfoCA, HostInfoS, pkS)), skCA) in 
+      let server_certificate = (HostInfoCA, HostInfoS, pkS, signCA_pkS) in
+      out(c, server_certificate);
+    (* key used for malicious client and abnormal server B *)
+      new skB: bitstring;
+      let pkB = pk(skB) in
+
+    ((!processClient(pkCA)) | 
+     (!processServerA(skS, pkS, server_certificate, pkCA, pkB)) | 
+     (!processServerB(skB))
+    )
+
+
+(******************************************************************)
+(* end of file *)
