@@ -1,0 +1,358 @@
+(***************************************************************************
+ *                                                                         *
+ *  Formal Verification of TLS 1.3 Full Handshake Protocol Using ProVerif  *
+ *                                                                         *
+ *  Kenichi Arai                                                           *
+ *                                                                         *
+ *  Copyright (C) Nagasaki University 2015-2016                            *
+ *                                                                         *
+ ***************************************************************************)
+
+(*
+    This file is free software; you can redistribute it and/or modify 
+    it under the terms of the BSD License.
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+    See the BSD license for more details (in file LICENSEBSD).
+*)
+
+(* 
+The Transport Layer Security (TLS) Protocol Version 1.3 
+    draft-ietf-tls-tls13-11 (January 22, 2016)
+
+===================================================================================
+       Client                                                   Server
+
+Key  / ClientHello
+Exch \  + key_share              -------->
+                                                           ServerHello  \ Key
+                                                           + key_share  / Exch
+                                                 {EncryptedExtensions}  ^
+                                                 {CertificateRequest*}  | Server
+                                                {ServerConfiguration*}  v Params
+                                                        {Certificate*}  ^
+                                                  {CertificateVerify*}  | Auth
+                                 <--------                  {Finished}  v
+     ^ {Certificate*}
+Auth | {CertificateVerify*}
+     v {Finished}                -------->
+       [Application Data]        <------->         [Application Data]
+
+
+              + Indicates extensions sent in the
+                previously noted message.
+
+              * Indicates optional or situation-dependent
+                messages that are not always sent.
+
+              {} Indicates messages protected using keys
+                 derived from the ephemeral secret.
+
+              [] Indicates messages protected using keys
+                 derived from the master secret.
+===================================================================================
+
+             Message flow for full TLS Handshake
+*)
+
+free c: channel.
+
+(* Hash *)
+fun H(bitstring): bitstring.
+
+(* Signature *)
+fun sign(bitstring, bitstring): bitstring.
+fun pk(bitstring): bitstring.
+  reduc forall x: bitstring, sk: bitstring; verify(sign(x, sk), x, pk(sk)) = true.
+
+(* Symmetric key encryption *)
+
+fun senc(bitstring, bitstring): bitstring.
+reduc forall m: bitstring, k: bitstring; sdec(senc(m,k),k) = m.
+
+
+(* Asymmetric key encryption *)
+
+fun aenc(bitstring, bitstring): bitstring.
+reduc forall m: bitstring, sk: bitstring; adec(aenc(m,pk(sk)),sk) = m.
+
+
+(* Host Information *)
+free HostInfoC, HostInfoS, HostInfoCA: bitstring.
+
+(* CP certificate *)
+free HostInfoCP:bitstring [private].
+
+
+
+(******************************************************************)
+(* Query1: secrecy *) 
+free AppData: bitstring [private].
+query attacker(AppData). 
+
+(* Queries2: verify integrity of response data *)
+event endResponseVerif(bitstring).
+event beginResponseVerif(bitstring).
+
+query response_data: bitstring;
+  event(endResponseVerif(response_data)) ==> event(beginResponseVerif(response_data)).
+
+(* Queries3: authentication server identity *)
+event endServerVerif(bitstring).
+event beginServerVerif(bitstring).
+
+query server_certificate: bitstring;
+  inj-event(endServerVerif(server_certificate)) ==> inj-event(beginServerVerif(server_certificate)).
+
+(******************************************************************)
+(* Client process *)
+
+let processClient(cur_time: bitstring, pkCA: bitstring)=
+    (* Setup *)
+      in(c, (client_version: bitstring, client_cipher_suites: bitstring));
+
+    (* Client Hello*)
+      new client_random: bitstring;
+      let client_hello = (client_version, client_random, client_cipher_suites) in
+
+    (* Client output *)
+      out(c, client_hello);
+
+    (* Client input *)
+      in(c, server_proxy_hello: bitstring);
+      let (server_version: bitstring, server_random: bitstring, server_cipher_suite: bitstring, server_certificate: bitstring) = server_proxy_hello in
+
+      if server_version = client_version && server_cipher_suite = client_cipher_suites then
+
+      let (=HostInfoCA, =HostInfoS, pkS: bitstring, signCA_pkS: bitstring) = server_certificate in 
+      if verify(signCA_pkS, H((HostInfoCA, HostInfoS, pkS)), pkCA) = true then
+
+      new pre_masterkey: bitstring;
+
+      (* Hash used to generate masterkey *)
+      let masterkey = H((client_random, server_random, pre_masterkey)) in 
+
+      let enc_client_finished = aenc(pre_masterkey, pkS) in
+
+    (* Client output *)
+      out(c, enc_client_finished);
+
+    (* Event end: authentication *)
+      in(c, enc_server_finished: bitstring);
+      let server_masterkey = adec(enc_server_finished, pkS) in
+      if server_masterkey = masterkey then 
+
+          
+    (* request a cookie *)
+      new request_ip: bitstring;
+      new user_id: bitstring;
+      let cookie_request = (request_ip, user_id) in
+
+    (* out requestment *)
+      out(c, cookie_request);
+
+    (* get cookie descriptor *)
+      in(c, cookie_descriptor: bitstring);
+      let(cookie_id: bitstring, cookie_key: bitstring, cookie_attribute: bitstring) = cookie_descriptor in
+
+    (* generate a cookie *)
+      let cookie = (cookie_id, user_id, cur_time, cookie_key) in
+
+    (* out a cookie to middle box *)
+      let senc_AppData = senc(AppData, masterkey) in
+      let senc_cookie = senc(cookie, masterkey) in
+
+      out(c, (senc_AppData, senc_cookie, masterkey));
+      
+
+    (* end queries: query 2 and 3 *)
+      in(c, (enc_transferred_response: bitstring, enc_transferred_server_certificate: bitstring));
+      let get_response = sdec(enc_transferred_response, masterkey) in
+      let get_server_certificate = sdec(enc_transferred_server_certificate, masterkey) in 
+      event endResponseVerif(get_response);
+      event endServerVerif(get_server_certificate).
+
+(******************************************************************)
+(* Cookie Server Process *)
+
+let processCookieServer(cur_time: bitstring) = 
+  
+  (* receive cookie requestment *)
+    in(c, cookie_request: bitstring);
+
+  (* deal with requestment content *)
+  let (request_ip: bitstring, user_id: bitstring) = cookie_request in
+
+  (* prepare cookie descriptor for client *)
+  new cookie_id: bitstring;
+  new cookie_key: bitstring;
+  new cookie_attribute: bitstring;
+  let cookie_descriptor = (cookie_id, cookie_key, cookie_attribute) in
+
+  (* out descriptor to client *)
+  out(c, cookie_descriptor);
+
+  (* prepare cookie descriptor to *)
+  let cookie_time = cur_time in
+  let request_record = (cookie_id, cookie_key, user_id, cookie_time) in
+
+  (* out to middle box *)
+  out(c, request_record).
+
+(******************************************************************)
+(* Proxy(MiddleBox) process *)
+let processProxy(skP: bitstring, pkP: bitstring, pkCA: bitstring, CP_certificate: bitstring)=
+    (* Setup *)
+      in(c, (proxy_version: bitstring, proxy_cipher_suite: bitstring));
+
+    (* Proxy input *)
+      in(c, client_hello: bitstring);
+      let (client_version: bitstring, client_random: bitstring, client_cipher_suites: bitstring) = client_hello in
+
+    (* Proxy output *)
+      let client_proxy_hello = (client_version, client_random, client_cipher_suites, pkP) in
+      out(c, client_proxy_hello);
+
+    (* Proxy input *)
+      in(c, server_hello: bitstring);
+      let (server_version: bitstring, server_random: bitstring, server_cipher_suite: bitstring, server_certificate: bitstring, enc_session_key: bitstring) = server_hello in
+      let session_key = adec(enc_session_key, skP) in
+
+      let (=HostInfoCA, =HostInfoS, pkS: bitstring, signCA_pkS: bitstring) = server_certificate in 
+      if verify(signCA_pkS, H((HostInfoCA, HostInfoS, pkS)), pkCA) = true then
+
+      if server_certificate = CP_certificate then
+
+    (* Proxy output *)
+      let server_proxy_hello = (server_version, server_random, server_cipher_suite, server_certificate) in
+      out(c, server_proxy_hello);
+
+    (* Proxy input *)
+      in(c, enc_client_finished: bitstring);
+
+    (* Proxy output *)
+      new proxy_random: bitstring;
+      let enc_proxy_random = aenc(proxy_random, pkS) in
+      let client_proxy_finished = (enc_client_finished) in 
+      out(c, client_proxy_finished);
+
+    (* get request_records userd for verification *)
+      in(c, request_record: bitstring);
+      let(save_cookie_id: bitstring, save_key: bitstring, save_user_id: bitstring, save_time: bitstring) = request_record in
+
+    (* receive cookie from client *)
+      in(c, (senc_AppData: bitstring, senc_cookie: bitstring, masterkey: bitstring));
+      let AppData = sdec(senc_AppData, masterkey) in
+      let cookie = sdec(senc_cookie, masterkey) in
+
+    (* verify the cookie *)
+      let(cookie_id: bitstring, user_id: bitstring, cookie_time: bitstring, cookie_key: bitstring) = cookie in
+      if cookie_id = save_cookie_id && cookie_time = save_time && user_id = save_user_id && cookie_key = save_key then
+
+      out(c, AppData);
+
+    (* transfer response *)
+      in(c, (enc_response: bitstring, enc_server_certificate: bitstring));
+      let(enc_transferred_response: bitstring) = enc_response in
+      let(enc_transferred_server_certificate: bitstring) = enc_server_certificate in
+      out(c, (enc_transferred_response, enc_transferred_server_certificate)).
+
+
+(******************************************************************)
+(* Server process *)
+
+let processServer(skS: bitstring, pkS: bitstring, server_certificate: bitstring, pkCA: bitstring)=
+    (* Setup *)
+      in(c, (server_version: bitstring, server_cipher_suite: bitstring));
+
+    (* Server input *)
+      in(c, client_proxy_hello: bitstring);
+      let (client_version: bitstring, client_random: bitstring, client_cipher_suites: bitstring, pkP: bitstring) = client_proxy_hello in
+
+      if client_version = server_version && client_cipher_suites = server_cipher_suite then
+
+    (* ServerHello , session key*)
+      new server_random: bitstring;
+      new session_key: bitstring;
+      let enc_session_key = aenc(session_key, pkP) in
+      let server_hello = (server_version, server_random, server_cipher_suite, server_certificate, enc_session_key) in
+
+    (* Server output *)
+      out(c, server_hello);
+
+    (* Server input*)
+      in(c, client_proxy_finished: bitstring);
+      let pre_masterkey = adec(client_proxy_finished, skS) in
+
+      (* Hash used to generate masterkey *)
+      let masterkey = H((client_random, server_random, pre_masterkey)) in
+      out(c, masterkey);
+    (* Server output *)
+      let enc_server_finished = adec(masterkey, skS) in
+      out(c, enc_server_finished);
+
+    (* Application Data *) (* Secrecy *)
+      in(c, senc_AppData: bitstring);
+    (* response to client *)
+      in(c, AppData: bitstring);
+
+    (* out response *)
+      new response: bitstring;
+      let enc_response = senc(response, masterkey) in
+      let enc_server_certificate = senc(server_certificate, masterkey) in
+      out(c, (enc_response, enc_server_certificate));
+
+      (* begin queries: query 2 and 3 *)
+      event beginResponseVerif(response);
+      event beginServerVerif(server_certificate).
+
+(******************************************************************)
+(* Certificate Authority (CA) process *)
+
+let processCA(skCA: bitstring) =
+      in(c, (HostInfoX: bitstring, pkX: bitstring));
+      if HostInfoX <> HostInfoC && 
+         HostInfoX <> HostInfoS &&
+         HostInfoX <> HostInfoCA then 
+      let signCA_pkX = sign(H((HostInfoCA, HostInfoX, pkX)), skCA) in 
+      let X_certificate = (HostInfoCA, HostInfoX, pkX, signCA_pkX) in
+      out(c, X_certificate).
+
+
+(******************************************************************)
+(* Main process *)
+
+process
+      new cur_time: bitstring;
+
+    (* Certificate Authority (CA) : skCA, pkCA *)
+      new skCA: bitstring;
+      let pkCA = pk(skCA) in
+      out(c, pkCA);
+    (* Server key : skS, pkS *)
+      new skS: bitstring;
+      let pkS = pk(skS) in
+    (* CP key : skCP, pkCP *)
+      new skCP: bitstring;
+      let pkCP = pk(skCP) in
+    (* Proxy key : skS, pkS *)
+      new skP: bitstring;
+      let pkP = pk(skP) in 
+    (* (Server) Certificate *)
+      let signCA_pkS = sign(H((HostInfoCA, HostInfoS, pkS)), skCA) in 
+      let server_certificate = (HostInfoCA, HostInfoS, pkS, signCA_pkS) in
+    (* (CP) Certificate *)
+      let signCA_pkCP = sign(H((HostInfoCA, HostInfoCP, pkCP)), skCA) in 
+      let CP_certificate = (HostInfoCA, HostInfoCP, pkCP, signCA_pkCP) in
+
+    ((!processClient(cur_time, pkCA)) |
+     (!processCookieServer(cur_time)) |
+     (!processProxy(skP, pkP, pkCA, CP_certificate)) | 
+     (!processServer(skS, pkS, server_certificate, pkCA)) |
+     (!processCA(skCA))
+    )
+
+
+(******************************************************************)
+(* end of file *)
